@@ -26,6 +26,27 @@ function argMax(array) {
   return index;
 }
 
+/**
+ * Returns if a box is within the passed selection or not
+ *
+ * @param {import("./syllabics.js").Box} box
+ * @param {import("./UISelectArea.js").SelectionBox|null} selection
+ * @returns
+ */
+function isBoxWithinSelection(box, selection) {
+  // If no selection the box should be considered within it
+  if (!selection) {
+    return true;
+  }
+
+  return (
+    box.x >= selection.x &&
+    box.x + box.width <= selection.x + selection.width &&
+    box.y >= selection.y &&
+    box.y + box.height <= selection.y + selection.height
+  );
+}
+
 export class UIMain extends HTMLElement {
   /**
    * @type {Array<string>}
@@ -121,6 +142,7 @@ export class UIMain extends HTMLElement {
       customElements.upgrade(uiSelectArea);
     }
 
+    // Assert the DOM nodes exist and are of the expected type
     client.assertElement(aboutButton, HTMLButtonElement);
     client.assertElement(debugButton, HTMLButtonElement);
     client.assertElement(rotateLeftButton, HTMLButtonElement);
@@ -249,7 +271,7 @@ export class UIMain extends HTMLElement {
     await sleepTick();
     await sleepTick();
 
-    // A slight blur helps improve contour matching
+    // A slight blur which helps improve contour matching
     cv.GaussianBlur(image, image, new cv.Size(7, 7), 1);
     this.#uiProgress.step();
     await sleepTick();
@@ -261,6 +283,8 @@ export class UIMain extends HTMLElement {
       n += 1;
     }
 
+    // Apply adaptive thresholding which works better than OTSU or plain
+    // thresholding in testing
     cv.adaptiveThreshold(
       image,
       image,
@@ -274,6 +298,7 @@ export class UIMain extends HTMLElement {
     await sleepTick();
     await sleepTick();
 
+    // Find the contours in the image
     const contours = new cv.MatVector();
     const hierarchy = new cv.Mat();
     cv.findContours(
@@ -301,18 +326,8 @@ export class UIMain extends HTMLElement {
         continue;
       }
 
-      if (
-        selection &&
-        (box.x < selection.x ||
-          box.x + box.width > selection.x + selection.width ||
-          box.y < selection.y ||
-          box.y + box.height > selection.y + selection.height)
-      ) {
-        contour.delete();
-        continue;
-      }
-
-      if (!syllabics.isValidBox(box)) {
+      // Ignore boxes outside of the selection or that are invalid
+      if (!isBoxWithinSelection(box, selection) || !syllabics.isValidBox(box)) {
         contour.delete();
         continue;
       }
@@ -323,6 +338,7 @@ export class UIMain extends HTMLElement {
     this.#uiProgress.step(0.5);
     await sleepTick();
 
+    // Handle edge case of no boxes found by just finishing the recognition
     if (!boxes.length) {
       image.delete();
       this.#output.value = "";
@@ -341,25 +357,35 @@ export class UIMain extends HTMLElement {
     this.#uiProgress.step(0.5);
     await sleepTick();
 
+    // Merge dots above syllabics with the syllabic below
     const mergedBoxes = syllabics.mergeSyllabicBoxes(filtered);
     this.#uiProgress.step(0.5);
     await sleepTick();
+
+    // Identify where the lines are
     const lines = syllabics.findLines(filtered);
     this.#uiProgress.step(0.5);
     await sleepTick();
+
+    // Group the boxes by the nearest identified line
     const grouped = syllabics.groupByLine(mergedBoxes, lines);
     this.#uiProgress.step(0.5);
     await sleepTick();
+
+    // Perform a more aggressive version of merging dots with the syllabics
+    // below that can be done once the boxes are grouped by line
     const mergedGrouped = syllabics.mergeGroupedSyllabicBoxes(grouped);
     this.#uiProgress.step(0.5);
     await sleepTick();
 
+    // Draw the debug data (found lines)
     lines.forEach((line) => {
       this.#debugCtx.strokeStyle = "red";
       this.#debugCtx.strokeRect(0, line, this.#canvas.width, 1);
     });
     await sleepTick();
 
+    // Draw the debug data (boxes of identified syllabics)
     grouped.forEach((line, i) => {
       this.#debugCtx.strokeStyle = i % 2 == 0 ? "green" : "blue";
       line.forEach((box) => {
@@ -369,9 +395,10 @@ export class UIMain extends HTMLElement {
     this.#uiProgress.step(0.5);
     await sleepTick();
 
-    const finalBoxes = mergedGrouped.flatMap((l) => l);
+    const numberOfBoxes = mergedGrouped.flatMap((l) => l).length;
     await sleepTick();
 
+    // Read the image again. This is the image used to copy the syllabics from
     const copyImage = cv.imread(this.#canvas);
     this.#uiProgress.step();
     await sleepTick();
@@ -380,10 +407,13 @@ export class UIMain extends HTMLElement {
     this.#uiProgress.step();
     await sleepTick();
 
-    // Keep current progress position
+    // Add the number of boxes onto the progress bar while also keeping
+    // the current position
     const progressScale = (this.#uiProgress.value + 1) / this.#uiProgress.max;
-    this.#uiProgress.max = finalBoxes.length * (1 + progressScale);
-    this.#uiProgress.value = finalBoxes.length * progressScale;
+    this.#uiProgress.max = numberOfBoxes * (1 + progressScale);
+    this.#uiProgress.value = numberOfBoxes * progressScale;
+
+    // Convert the found boxes into syllabics
     let result = "";
     for (let i = 0; i < mergedGrouped.length; i++) {
       const line = mergedGrouped[i];
@@ -393,30 +423,38 @@ export class UIMain extends HTMLElement {
         result += "\n";
       }
 
-      const meanAreaLine = syllabics.mean(line.map((b) => b.height * b.width));
-      const medianWidth = syllabics.median(line.map((b) => b.width));
-      const meanGap = syllabics.meanGap(line);
-      const spaceThreshold = Math.max(medianWidth / 2, meanGap) * 1.5;
+      // Calculate line metrics
+      const meanLineArea = syllabics.mean(line.map((b) => b.height * b.width));
+      const medianLineWidth = syllabics.median(line.map((b) => b.width));
+      const meanLineGap = syllabics.meanGap(line);
+      const spaceThreshold = Math.max(medianLineWidth / 2, meanLineGap) * 1.5;
       await sleepTick();
 
       for (let j = 0; j < line.length; j++) {
         const box = line[j];
         const area = box.width * box.height;
         const isDot =
-          area < meanAreaLine / 8 &&
+          area < meanLineArea / 8 &&
           box.height < 2.5 * box.width &&
           box.width < 2.5 * box.height;
 
         const img = imageUtils.extractBox(copyImage, box);
         await sleepTick();
+
+        // Normalise the extracted syllabic to 0-1 range by dividing by 255
+        // (this is done by multiplying by 1/255)
         const size = img.size();
         const ones = cv.Mat.ones(size.height, size.width, cv.CV_8UC1);
         const input = img.mul(ones, 1 / 255);
         ones.delete();
         await sleepTick();
+
+        // Recognise the syllabic using thetensorflow model
         const sample = this.#tf.tensor4d(input.data, [1, 42, 42, 1], null);
         const prediction = this.#model.predict(sample).dataSync();
         await sleepTick();
+
+        // Clean up OpenCV memory for extracted syllabic
         input.delete();
         img.delete();
 
@@ -428,7 +466,7 @@ export class UIMain extends HTMLElement {
         }
         prevX = box.x + box.width;
 
-        const map = {
+        const finalsMap = {
           ᑕ: "ᒼ",
           ᑐ: "ᐣ",
           ᑎ: "ᐢ",
@@ -447,10 +485,12 @@ export class UIMain extends HTMLElement {
           ᕦ: "ᕪ",
         };
 
-        // If smaller than mean, then it is likely a final
-        if (box.height * box.width < meanAreaLine * 0.7 && syllabic in map) {
+        // If smaller than mean, then it is likely the final and not the full
+        // sized syllabic
+        const boxArea = box.height * box.width;
+        if (boxArea < meanLineArea * 0.7 && syllabic in finalsMap) {
           // @ts-ignore
-          result += map[syllabic];
+          result += finalsMap[syllabic];
         } else {
           result += syllabic;
         }
