@@ -6,6 +6,26 @@ import { UIAbout } from "./UIAbout.js";
 import { UIProgress } from "./UIProgress.js";
 import { UISelectArea } from "./UISelectArea.js";
 
+/**
+ * Finds the index of the largest number
+ * in the passed array
+ * @param {number[]} array
+ * @returns
+ */
+function argMax(array) {
+  let max = array[0];
+  let index = 0;
+
+  for (let i = 0; i < array.length; i++) {
+    if (array[i] > max) {
+      index = i;
+      max = array[i];
+    }
+  }
+
+  return index;
+}
+
 export class UIMain extends HTMLElement {
   /**
    * @type {Array<string>}
@@ -349,24 +369,6 @@ export class UIMain extends HTMLElement {
     this.#uiProgress.step(0.5);
     await sleepTick();
 
-    /**
-     * @param {number[]} array
-     * @returns
-     */
-    function argMax(array) {
-      let max = array[0];
-      let index = 0;
-
-      for (let i = 0; i < array.length; i++) {
-        if (array[i] > max) {
-          index = i;
-          max = array[i];
-        }
-      }
-
-      return index;
-    }
-
     const finalBoxes = mergedGrouped.flatMap((l) => l);
     await sleepTick();
 
@@ -418,7 +420,6 @@ export class UIMain extends HTMLElement {
         input.delete();
         img.delete();
 
-        const confidence = prediction[argMax(prediction)];
         const syllabic = isDot ? "ᐧ" : this.#creeClasses[argMax(prediction)];
 
         // Add spaces if more than spaceThreshold apart
