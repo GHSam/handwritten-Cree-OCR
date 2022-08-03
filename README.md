@@ -1,8 +1,17 @@
 # Handwritten Cree OCR (Optical Character Recognition)
 
+<p align="center">
+<img src="https://github.com/GHsam/handwritten-Cree-OCR/blob/master/screenshot.png?raw=true" width="600" alt="Screenshot of Cree OCR">
+</p>
+
 This project aims to be a basic form of OCR software for handwritten Cree trained on the [handwritten Cree dataset](https://github.com/GHSam/handwritten-Cree).
 
-[Demo is available here](https://samclarke.net/ocreer/) (this page is ~13 MiB so may be expensive to view on a mobile).
+It is [available here](https://samclarke.net/ocreer/) (warning: this page is ~13 MiB).
+
+A demo image to try it out with is [available here](https://github.com/GHSam/handwritten-Cree-OCR/raw/master/demo.png).
+
+
+### Limitations
 
 There are currently a few limitations with the software:
 * The image need to be fairly clean, it doesn't currently handle background noise well
