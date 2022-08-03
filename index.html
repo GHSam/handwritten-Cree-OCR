@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
+    <title>Optical Cree Recognition</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Noto+Sans+Canadian+Aboriginal&display=swap"
+      rel="stylesheet"
+    />
+
+    <style>
+      html {
+        height: 100%;
+        font: 100%/1.5 sans-serif;
+      }
+      body {
+        display: flex;
+        min-height: 100%;
+        flex-direction: column;
+        margin: 0;
+        background: #555;
+        color: #fafafa;
+      }
+
+      a {
+        color: inherit;
+      }
+      a:hover {
+        text-decoration: none;
+      }
+
+      button {
+        display: inline-flex;
+        line-height: 1;
+        align-items: center;
+        color: #fafafa;
+        font: inherit;
+        background: #333;
+        border: 1px solid #444;
+        cursor: pointer;
+        padding: 0.25em 0.5em;
+        border-radius: 0.125em;
+        margin-right: 0.5em;
+        gap: 0.5em;
+      }
+      button:hover,
+      button:focus-visible {
+        background: #444;
+        border-color: #555;
+      }
+      button:active {
+        background: #222;
+        border-color: #333;
+      }
+      button:disabled {
+        background: #555;
+        border-color: #666;
+      }
+
+      ui-progress,
+      #loading {
+        position: fixed;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: rgba(0, 0, 0, 0.6);
+        display: flex;
+        flex: 1;
+        align-items: center;
+      }
+      ui-progress > div,
+      #loading > div {
+        background: #222;
+        width: 100%;
+        text-align: center;
+      }
+      ui-main {
+        flex: 1;
+        display: grid;
+        grid-template-areas:
+          "toolbar toolbar"
+          "image output";
+        grid-template-columns: 50% 50%;
+        grid-template-rows: auto 1fr;
+      }
+
+      @media (max-width: 600px) and (orientation: portrait) {
+        ui-main {
+          flex: 1;
+          display: grid;
+          grid-template-areas:
+            "toolbar"
+            "image"
+            "output";
+          grid-template-columns: 1fr;
+          grid-template-rows: auto 1fr 1fr;
+        }
+      }
+
+      .toolbar {
+        grid-area: toolbar;
+        display: flex;
+        align-items: center;
+        background: #111;
+        padding: 0.5em;
+        margin: 0;
+        border: 0;
+        flex-wrap: wrap;
+        padding: max(0.5em, env(safe-area-inset-top))
+          max(0.5em, env(safe-area-inset-right)) 0.5em
+          max(0.5em, env(safe-area-inset-left));
+      }
+
+      .canvas-container {
+        grid-area: image;
+        position: relative;
+        max-height: 100%;
+        overflow: auto;
+      }
+      .canvas-container canvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        max-width: 100%;
+        max-height: 100%;
+        margin: auto;
+        user-select: none;
+        touch-action: pinch-zoom;
+      }
+
+      .output {
+        grid-area: output;
+        font-size: 1.75em;
+        padding: 0.5em;
+        /* white-space: nowrap;
+        overflow: auto; */
+        font-family: "Noto Sans Canadian Aboriginal", Gadugi, Euphemia,
+          "Euphemia UCAS", "Aboriginal Sans", sans-serif;
+      }
+
+      ui-about {
+        position: fixed;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: rgba(0, 0, 0, 0.6);
+      }
+      ui-about > div {
+        max-width: 30em;
+        padding: 1em 1.5em;
+        background: #111;
+        margin: auto;
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        max-height: fit-content;
+        border-radius: 0.25em;
+        overflow: auto;
+      }
+      ui-about > div > div {
+        text-align: right;
+      }
+
+      ui-error {
+        position: fixed;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: rgba(0, 0, 0, 0.6);
+      }
+      ui-error textarea {
+        width: 100%;
+        height: 6em;
+      }
+      ui-error > div {
+        max-width: 30em;
+        padding: 1em 1.5em;
+        background: #111;
+        margin: auto;
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        max-height: fit-content;
+        border-radius: 0.25em;
+        overflow: auto;
+      }
+      ui-error > div > div {
+        text-align: right;
+      }
+    </style>
+
+    <template id="ui-template">
+      <fieldset class="toolbar">
+        <input
+          type="file"
+          style="display: none"
+          class="file-input"
+          accept="image/gif, image/jpeg, image/png"
+        />
+        <button class="load-button" title="Open an image to recognise">
+          <!-- Icon from https://materialdesignicons.com/ -->
+          <svg style="width: 24px; height: 24px" viewBox="0 0 24 24">
+            <path
+              fill="currentColor"
+              d="M19,20H4C2.89,20 2,19.1 2,18V6C2,4.89 2.89,4 4,4H10L12,6H19A2,2 0 0,1 21,8H21L4,8V18L6.14,10H23.21L20.93,18.5C20.7,19.37 19.92,20 19,20Z"
+            />
+          </svg>
+          Open
+        </button>
+        <button
+          class="rotate-left-button"
+          title="Rotate image counterclockwise"
+        >
+          <svg style="width: 24px; height: 24px" viewBox="0 0 24 24">
+            <path
+              fill="currentColor"
+              d="M21 3V7H13.5C11.57 7 10 8.57 10 10.5V13H14L8 20L2 13H6V10.5C6 6.36 9.36 3 13.5 3H21Z"
+            />
+          </svg>
+        </button>
+        <button class="rotate-right-button" title="Rotate image clockwise">
+          <svg style="width: 24px; height: 24px" viewBox="0 0 24 24">
+            <path
+              fill="currentColor"
+              d="M10.5 3C14.64 3 18 6.36 18 10.5V13H22L16 20L10 13H14V10.5C14 8.57 12.43 7 10.5 7H3V3H10.5Z"
+            />
+          </svg>
+        </button>
+        <!-- <button>Arbitrary rotation</button> -->
+        <button
+          class="select-area-button"
+          title="Select the area of the image to perform recognition on"
+        >
+          <svg style="width: 24px; height: 24px" viewBox="0 0 24 24">
+            <path
+              fill="currentColor"
+              d="M14,17H17V14H19V17H22V19H19V22H17V19H14V17M12,17V19H9V17H12M7,17V19H3V15H5V17H7M3,13V10H5V13H3M3,8V4H7V6H5V8H3M9,4H12V6H9V4M15,4H19V8H17V6H15V4M19,10V12H17V10H19Z"
+            />
+          </svg>
+          Select area
+        </button>
+        <button
+          class="convert-button"
+          title="Convert the image or selection region into text"
+        >
+          <svg style="width: 24px; height: 24px" viewBox="0 0 24 24">
+            <path
+              fill="currentColor"
+              d="M2 4C2 2.9 2.9 2 4 2H8V4H4V8H2V4M22 20C22 21.11 21.11 22 20 22H16V20H20V16H22V20M4 22C2.9 22 2 21.11 2 20V16H4V20H8V22H4M20 2C21.11 2 22 2.9 22 4V8H20V4H16V2H20M9 7V9H11V17H13V9H15V7H9Z"
+            />
+          </svg>
+          Convert
+        </button>
+        <button class="debug-button">Debug</button>
+        <button class="about-button" title="About this software">
+          <svg style="width: 24px; height: 24px" viewBox="0 0 24 24">
+            <path
+              fill="currentColor"
+              d="M13,9H11V7H13M13,17H11V11H13M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2Z"
+            />
+          </svg>
+        </button>
+        <!-- Threshold adjuster Slightly tweak left / right -->
+      </fieldset>
+
+      <div class="canvas-container">
+        <canvas class="canvas"></canvas>
+        <canvas class="debug-canvas"></canvas>
+        <ui-select-area></ui-select-area>
+      </div>
+      <textarea class="output"></textarea>
+    </template>
+
+    <template id="loading-template">
+      <div>
+        <p><progress max="100"></progress></p>
+        <p>Loading... Please wait.</p>
+      </div>
+    </template>
+
+    <template id="about-template">
+      <div>
+        <h2>About Optical Cree Recognition</h2>
+        <p>
+          Optical Cree Recognition is open source optical character recognition
+          software for handwritten Cree syllabics.
+        </p>
+        <p>
+          It was created by Sam Clarke as a final year project for a Computer
+          Science degree.
+        </p>
+        <p>
+          This project was made possible thanks to all the volunteers who
+          contributed handwriting samples. The full dataset has been released
+          under an open license and is
+          <a href="https://github.com/GHSam/handwritten-Cree">available here</a
+          >.
+        </p>
+        <div>
+          <button>Close dialog</button>
+        </div>
+      </div>
+    </template>
+
+    <template id="error-template">
+      <div>
+        <h2>Error</h2>
+        <p>The following error has ocurred:</p>
+        <textarea readonly class="message"></textarea>
+        <p>
+          Please try refreshing the page to try again. If the error continues,
+          please report it to
+          <a href="mailto:sjc37@student.london.ac.uk?subject=Cree+OCR+Error"
+            >sjc37@student.london.ac.uk</a
+          >
+          including the error from the box above.
+        </p>
+        <div>
+          <button>Refresh page</button>
+        </div>
+      </div>
+    </template>
+    <script type="module" src="index.js" async></script>
+  </head>
+  <body>
+    <div id="loading">
+      <div>
+        <noscript>
+          <p>You need to enable JavaScript to run this app.</p>
+          <style>
+            .no-js-hide {
+              display: none;
+            }
+          </style>
+        </noscript>
+        <p class="no-js-hide"><progress max="100"></progress></p>
+        <p class="no-js-hide">Loading... This may take a while.</p>
+      </div>
+    </div>
+  </body>
+</html>
