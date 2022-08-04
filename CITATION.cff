@@ -1,0 +1,12 @@
+cff-version: 1.2.0
+title: Optical Cree Recognition
+abstract: A basic form of OCR created for handwritten Cree syllabics. Written as a web application using Tensorflow and OpenCV.
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+license: "MIT"
+authors:
+  - given-names: Sam
+    family-names: Clarke
+    email: sjc37@student.london.ac.uk
