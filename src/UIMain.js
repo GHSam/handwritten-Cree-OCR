@@ -423,6 +423,11 @@ export class UIMain extends HTMLElement {
         result += "\n";
       }
 
+      // Handle edge case where line is empty
+      if (!line.length) {
+        continue;
+      }
+
       // Calculate line metrics
       const meanLineArea = syllabics.mean(line.map((b) => b.height * b.width));
       const medianLineWidth = syllabics.median(line.map((b) => b.width));
